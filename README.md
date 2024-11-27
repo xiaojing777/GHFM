@@ -11,4 +11,4 @@ To run these scripts, open them in RStudio and execute the code step-by-step.
 
 ## About
 - Author: Xiaojing Sun
-- Contact: your_email@example.com
+- Contact: sun1131@purdue.edu
