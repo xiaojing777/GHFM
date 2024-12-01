@@ -220,11 +220,8 @@ fuse.pred = function(fuse.tmp){
   for (i in 1:length(y.test)) {
     y.fuse.pred[i,] = as.numeric((t(x.test.coef[i,]))%*%Z%*%fuse.mat[i,]) + fuse.int[i]
   }
+  return(y.fuse.pred)
 }
-                                   
-
-
-
 
 sim.b.spl.sq.norm.fuse = function(beta.coef, beta.basis, fuse.res){
   Z1 = inprod(beta.basis, beta.basis)
