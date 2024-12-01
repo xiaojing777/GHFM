@@ -1,15 +1,11 @@
 library(fda)
 library(MASS)
 
-
-
 #calculate L2 norm
 vecnorm = function(b){
   res = sqrt(sum(b^2))
   return(res)
 }
-
-
 
 #Homogeneous functional regression
 ord_func_reg = function(x.fd, y, beta.basis, phi){
@@ -24,9 +20,7 @@ ord_func_reg = function(x.fd, y, beta.basis, phi){
   
   res = list(b.hat = b.hat, alpha = alpha)
   return(res)
-  
 }
-
 
 replicate_rows <- function(mat, k) {
   # Split the matrix into a list of rows
@@ -37,9 +31,6 @@ replicate_rows <- function(mat, k) {
   
   return(new_mat)
 }
-
-
-
 
 #Homogeneous functional regression, return p-value
 my_ord_func_reg_p_val = function(x.fd, y, beta.basis, phi){
@@ -67,12 +58,9 @@ my_ord_func_reg_p_val = function(x.fd, y, beta.basis, phi){
   
   p.val = 1-pf(Fratio, nbasis-1, ny-nbasis)
   
-  
-  
   res = list(b.hat=b.hat, alpha = alpha,  y.hat = y.hat, p.val = p.val, F.val = F.val)
   return(res)
 }
-
 
 #Clustering wrt beta(t)
 Pre_clustering_HFGM = function(K=100, X, y, beta.basis, phi, max.iteration=100, tol=0.005){
@@ -136,10 +124,6 @@ Pre_clustering_HFGM = function(K=100, X, y, beta.basis, phi, max.iteration=100, 
   return(grp)
 }
 
-
-
-
-
 #Choose tuning parameters
 HFGM_tune = function(x.fd, y, beta.basis, b0, lam, phi, max.iteration, tol=1e-5){
   err.score = matrix(0, nrow=length(lam), ncol=length(phi))
@@ -182,14 +166,12 @@ HFGM_tune = function(x.fd, y, beta.basis, b0, lam, phi, max.iteration, tol=1e-5)
   return(err.score)
 }
 
-
 b.func = function(t){
   beta.basis = create.bspline.basis(rangeval = c(0,24), nbasis = L, norder = 4)
   mat <- eval.basis(t,beta.basis)
   res = t(mat)
   return(res)
 }
-
 
 sim.b.spl.sq.norm.ord = function(beta.coef, beta.basis, ord.res){
   Z1 = inprod(beta.basis, beta.basis)
@@ -266,7 +248,6 @@ fuse_group = function(beta.basis, b.mat, tol=0){
 }
 
 
-
 replicate_rows <- function(mat, k) {
   # Split the matrix into a list of rows
   rows <- split(mat, row(mat))
@@ -276,9 +257,6 @@ replicate_rows <- function(mat, k) {
   
   return(new_mat)
 }
-
-
-
 
 # Resp for the case of 3/4 groups
 resp = function(clus_num, y, x, beta.basis, D=seq(0, 24, length.out=24)){
@@ -295,8 +273,6 @@ resp = function(clus_num, y, x, beta.basis, D=seq(0, 24, length.out=24)){
   if(clus_num==4){
     grp4 = which(cluster_assignments==4)
   }
-  
-  
   
   # each column of x is a subject
   x1 = x[,grp1]
