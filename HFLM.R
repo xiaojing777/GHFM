@@ -207,42 +207,14 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
     
     
     res.final = list(b.hat = b.hat, b.res = b.res, grp = grp, intercept = fuse.intercept)
-    
-    
-    
-    
+     
   }
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
   
   
   
   #-----------------------------------------------------------------------------------------------------
   
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
   
   if(clustering==FALSE){
     n = length(y)
