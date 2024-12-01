@@ -214,12 +214,12 @@ sim.b.spl.sq.norm.true.beta = function(beta.coef, beta.basis){
 }
                               
 fuse.pred = function(fuse.tmp){
-fuse.mat = as.matrix(fuse.tmp$b.res)
-fuse.int = fuse.tmp$intercept
-y.fuse.pred = matrix(0, nrow = length(y.test), ncol = 1)
-for (i in 1:length(y.test)) {
-  y.fuse.pred[i,] = as.numeric((t(x.test.coef[i,]))%*%Z%*%fuse.mat[i,]) + fuse.int[i]
-}
+  fuse.mat = as.matrix(fuse.tmp$b.res)
+  fuse.int = fuse.tmp$intercept
+  y.fuse.pred = matrix(0, nrow = length(y.test), ncol = 1)
+  for (i in 1:length(y.test)) {
+    y.fuse.pred[i,] = as.numeric((t(x.test.coef[i,]))%*%Z%*%fuse.mat[i,]) + fuse.int[i]
+  }
 }
                                    
 
