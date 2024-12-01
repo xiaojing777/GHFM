@@ -77,7 +77,7 @@ my_ord_func_reg_p_val = function(x.fd, y, beta.basis, phi){
 
 
 #Clustering wrt beta(t)
-Pre_clustering_HFGM = function(K=100, X, y, beta.basis, phi, max.iteration=40, tol=0.005){
+Pre_clustering_HFGM = function(K=100, X, y, beta.basis, phi, max.iteration=100, tol=0.005){
   
   #X is n*24 data frame
   
@@ -271,7 +271,7 @@ replicate_rows <- function(mat, k) {
 
 
 
-
+# Resp for the case of 3/4 groups
 resp = function(clus_num, y, x, beta.basis, D=seq(0, 24, length.out=24)){
   n = length(y)
   L = beta.basis$nbasis
