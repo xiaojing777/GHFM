@@ -163,8 +163,7 @@ func_fuse_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept = FALSE,
     b.res = as.data.frame(b.res)
     
     fuse.intercept = c()
-    if(intercept==TRUE){
-      linshi = as.matrix(b.res)
+    linshi = as.matrix(b.res)
       X.train.26 = t(x.fd$coefs)
       neiji = inprod(x.fd$basis, beta.basis)
       for (j in 1:KK) {
@@ -173,6 +172,8 @@ func_fuse_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept = FALSE,
         tmp2 = as.matrix(tmp2)
         fuse.intercept[j] = mean(tmp2)
       }
+    if(intercept==TRUE){
+      fuse.intercept = mean(fuse.intercept)
     }
     
     
@@ -336,13 +337,17 @@ func_fuse_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept = FALSE,
     b.res = as.data.frame(b.res)
     
     fuse.intercept = c()
-    if(intercept==TRUE){
+    linshi = as.matrix(b.res)
       X.train.26 = t(x.fd$coefs)
-      for (j in 1:n) {
-        linshi = as.matrix(b.res)
-        tmp = as.numeric(y[j,] - X.train.26[j,]%*%Z%*%linshi[j,])
-        fuse.intercept[j] = mean(tmp)
+      neiji = inprod(x.fd$basis, beta.basis)
+      for (j in 1:KK) {
+        tmp1 = which(label==j)
+        tmp2 = y[tmp1] - X.train.26[tmp1,]%*%neiji%*%linshi[j,]
+        tmp2 = as.matrix(tmp2)
+        fuse.intercept[j] = mean(tmp2)
       }
+    if(intercept==TRUE){
+      fuse.intercept = mean(fuse.intercept)
     }
     
     
