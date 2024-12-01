@@ -29,11 +29,9 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
       temp <- inprod(beta.basis,beta.basis,rng=c(breaks[k],breaks[k+1]))
       W[,,k] <- temp
     }
-    
-    
+  
     Z = inprod(x.fd$basis, beta.basis)
-    
-    
+   
     # Big.Gamma is nL dimension
     tmp = t(x.fd$coefs)%*%Z
     Big.Gamma = matrix(0, nrow = n*L, ncol = 1)
@@ -53,9 +51,7 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
       
       sum.y.E.ga[((i-1)*L+1):(i*L), 1] = small.sum
     }
-    
-    
-    
+  
     R1 = eval.penalty(beta.basis,int2Lfd(2))
     list2 = NULL
     for (i in 1:KK){
@@ -63,8 +59,7 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
     }
     library(Matrix)
     R = as.matrix(bdiag(list2))
-    
-    
+   
     it = 1
     b.l.plus1 = b0
     
@@ -73,8 +68,7 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
       b.l = b.l.plus1
       
       V.l = matrix(0,nrow = KK*L, ncol = KK*L)
-      
-      
+
       ij.start.time = Sys.time()
       
       x.inprod = inprod(x.fd$basis, x.fd$basis)
@@ -82,8 +76,7 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
       
       for (i in 1:KK) {
         for (j in (1:KK)[-i]) {
-          
-          
+  
           b.i.l = b.l[(i*L-L+1):(i*L)]
           b.j.l = b.l[(j*L-L+1):(j*L)]
           
@@ -91,7 +84,6 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
           delta_ij = t(tmp1)%*%x.inprod%*% tmp1 + 0.01
           delta_ij = as.numeric(delta_ij)
 
-          
           W.sum = matrix(0, nrow = L, ncol = L)
           
           grp=0
@@ -113,8 +105,7 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
             V.l[(j*L-L+1):(j*L) , (i*L-L+1):(i*L)] = V.l[(j*L-L+1):(j*L) , (i*L-L+1):(i*L)] + W.sum
             V.l[(j*L-L+1):(j*L) , (j*L-L+1):(j*L)] = V.l[(j*L-L+1):(j*L) , (j*L-L+1):(j*L)] + W.sum
           }
-          
-          
+        
         }
         
       }
@@ -166,19 +157,16 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
       }
       
       b.l.plus1 = b.grad.k.plus1
-      
-      
+
       inv.end.time = Sys.time()
       inv.time = inv.end.time - inv.start.time
       print(c("Inverse Time:", inv.time))
       print("Inverse Calculated")
-      
-      
+
       it = it+1
       
     }
-    
-    
+  
     b.hat = b.l.plus1
     
     b.res = matrix(0, nrow = KK, ncol = L)
@@ -204,18 +192,11 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
     if(intercept==TRUE){
       fuse.intercept = mean(fuse.intercept)
     }
-    
-    
+   
     res.final = list(b.hat = b.hat, b.res = b.res, grp = grp, intercept = fuse.intercept)
      
   }
-  
-  
-  
-  #-----------------------------------------------------------------------------------------------------
-  
 
-  
   if(clustering==FALSE){
     n = length(y)
     
@@ -228,15 +209,13 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
     M = length(breaks) - 1
     
     norder = L-M+1
-    
-    
+   
     W = array(0,dim=c(L,L,M))
     for (k in 1:M){
       temp <- inprod(beta.basis,beta.basis,rng=c(breaks[k],breaks[k+1]))
       W[,,k] <- temp
     }
-    
-    
+
     Z = inprod(x.fd$basis,beta.basis)
     
     # Big.Gamma is the summation of all E_i%*%gamma_i
@@ -252,9 +231,7 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
     for (i in 1:n) {
       sum.y.E.ga[((i-1)*L+1):(i*L), 1] = y[i]*tmp[i,]
     }
-    
-    
-    
+   
     R1 = eval.penalty(beta.basis,int2Lfd(2))
     list2 = NULL
     for (i in 1:n){
@@ -277,23 +254,18 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
       b.l = b.l.plus1
       
       V.l = matrix(0,nrow = n*L, ncol = n*L)
-      
-      
+
       ij.start.time = Sys.time()
       
       x.inprod = inprod(x.fd$basis, x.fd$basis)
       x.matt = t(x.fd$coefs)
-      
-      
+   
       for (i in 1:n) {
         for (j in (1:n)[-i]) {
-          
-          
+        
           b.i.l = b.l[(i*L-L+1):(i*L)]
           b.j.l = b.l[(j*L-L+1):(j*L)]
-          
-          
-          
+
           W.sum = matrix(0, nrow = L, ncol = L)
           
           
@@ -360,9 +332,7 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
       }
       
       b.l.plus1 = b.grad.k.plus1
-      
-      
-      
+    
       inv.end.time = Sys.time()
       inv.time = inv.end.time - inv.start.time
       print(c("Inverse Time:", inv.time))
@@ -371,9 +341,7 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
       it = it+1
       
     }
-    
-    
-    
+   
     b.hat = b.l.plus1
     
     b.res = matrix(0, nrow = n, ncol = L)
@@ -395,14 +363,10 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
     if(intercept==TRUE){
       fuse.intercept = mean(fuse.intercept)
     }
-    
-    
+
     res.final = list(b.hat = b.hat, b.res = b.res, grp = grp, intercept = fuse.intercept)
     
-    
   }
-  
-  
   
   return(res.final)
   
