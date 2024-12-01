@@ -190,8 +190,7 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
     b.res = as.data.frame(b.res)
     
     fuse.intercept = c()
-    if(intercept==TRUE){
-      linshi = as.matrix(b.res)
+    linshi = as.matrix(b.res)
       X.train.26 = t(x.fd$coefs)
       neiji = inprod(x.fd$basis, beta.basis)
       for (j in 1:KK) {
@@ -202,6 +201,8 @@ func_fuse_logistic_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept
         tmp2 = as.matrix(y[tmp1] - logit_tmp)
         fuse.intercept[j] = mean(tmp2)
       }
+    if(intercept==TRUE){
+      fuse.intercept = mean(fuse.intercept)
     }
     
     
