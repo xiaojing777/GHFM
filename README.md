@@ -3,8 +3,8 @@
 This repository contains R scripts for the GHFM project.
 
 ## Files
-- `HFGM.R`: Description of what this file does.
-- `HFLM.R`: Description of what this file does.
+- `HFGM.R`: This R file includes the function of conducting HFGM.
+- `HFLM.R`: This R file includes the function of conducting HFLM.
 
 ## Usage
 To run these scripts, open them in RStudio and execute the code step-by-step.
