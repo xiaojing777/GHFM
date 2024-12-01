@@ -218,7 +218,11 @@ fuse.pred = function(fuse.tmp){
   fuse.int = fuse.tmp$intercept
   y.fuse.pred = matrix(0, nrow = length(y.test), ncol = 1)
   for (i in 1:length(y.test)) {
-    y.fuse.pred[i,] = as.numeric((t(x.test.coef[i,]))%*%Z%*%fuse.mat[i,]) + fuse.int[i]
+    if(length(fuse.int))>1{
+      y.fuse.pred[i,] = as.numeric((t(x.test.coef[i,]))%*%Z%*%fuse.mat[i,]) + fuse.int[i]
+    }else{
+      y.fuse.pred[i,] = as.numeric((t(x.test.coef[i,]))%*%Z%*%fuse.mat[i,]) + fuse.int
+      }
   }
   return(y.fuse.pred)
 }
