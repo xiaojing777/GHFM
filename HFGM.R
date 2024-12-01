@@ -1,4 +1,4 @@
-func_fuse_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept = FALSE, clustering=FALSE, x.penalty=FALSE, KK=0, label=NULL, max.iteration=30, tol=0.95){
+func_fuse_lasso = function(x.fd, y, beta.basis, b0, lam, phi, intercept = FALSE, clustering=FALSE, x.penalty=FALSE, KK=0, label=NULL, max.iteration=100, tol=0.05){
   #Check whether a pre-clustering has been made
   if(clustering==TRUE){
     #sample size: n
