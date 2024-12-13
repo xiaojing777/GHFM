@@ -127,6 +127,4 @@ vecnorm(y.test)/n
 
 
 
-## About
-- Author: Xiaojing Sun
-- Contact: sun1131@purdue.edu
+
