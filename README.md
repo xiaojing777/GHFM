@@ -81,6 +81,8 @@ group_check = cbind(1:n, pre_grp)
 true_grp = c(rep(1, n/2), rep(2, n/2))
 group_check = cbind(group_check, true_grp)
 
+---
+
 
 ## 📘 Example: Running HFGM
 
