@@ -81,8 +81,7 @@ group_check = cbind(1:n, pre_grp)
 true_grp = c(rep(1, n/2), rep(2, n/2))
 group_check = cbind(group_check, true_grp)
 
-
----
+```
 
 
 ## 📘 Example: Running HFGM
@@ -146,8 +145,5 @@ ord.tmp = ord_func_reg(x.fd,y,beta.basis, phi2)$b.hat
 
 sim.b.spl.sq.norm.fuse(beta.coef, beta.basis, fuse.mat)/sim.b.spl.sq.norm.true.beta(beta.coef, beta.basis)
 sim.b.spl.sq.norm.ord(beta.coef, beta.basis, ord.tmp)/sim.b.spl.sq.norm.true.beta(beta.coef, beta.basis)
-
-
-
 
 
