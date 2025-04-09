@@ -8,18 +8,31 @@ vecnorm = function(b){
 }
 
 #Homogeneous functional regression
-ord_func_reg = function(x.fd, y, beta.basis, phi){
-  y = as.matrix(y)
-  Z0 = inprod(x.fd$basis,beta.basis)
-  Z = t(x.fd$coefs)%*%Z0
-  R = eval.penalty(beta.basis,int2Lfd(2))
+ord_func_reg = function(x.fd, y, beta.basis, phi) {
+  # Ensure y is properly formatted as a single-column matrix
+  y <- matrix(y, ncol = 1)
   
-  b.hat = solve(t(Z)%*%Z+phi*R)%*%t(Z)%*%y
-  X.train.26 = t(x.fd$coefs)
-  alpha = mean(y - X.train.26%*%Z0%*%b.hat)
+  # Calculate necessary matrices
+  Z0 <- inprod(x.fd$basis, beta.basis)
+  Z <- t(x.fd$coefs) %*% Z0
   
-  res = list(b.hat = b.hat, alpha = alpha)
-  return(res)
+  # Regularization matrix with small diagonal adjustment for stability
+  R <- eval.penalty(beta.basis, int2Lfd(2))
+  diag_adjust <- 0.001 * diag(nrow(R))
+  
+  # Check matrix dimensions for compatibility
+  if(ncol(Z) != nrow(R)) {
+    stop("Dimension mismatch between Z and R matrices")
+  }
+  
+  # Calculate coefficients with regularization
+  b.hat <- solve(t(Z) %*% Z + phi * R + diag_adjust) %*% t(Z) %*% y
+  
+  # Calculate intercept
+  X.train.26 <- t(x.fd$coefs)
+  alpha <- mean(y - X.train.26 %*% Z0 %*% b.hat)
+  
+  return(list(b.hat = b.hat, alpha = alpha))
 }
 
 replicate_rows <- function(mat, k) {
@@ -63,62 +76,81 @@ my_ord_func_reg_p_val = function(x.fd, y, beta.basis, phi){
 }
 
 #Clustering wrt beta(t)
-Pre_clustering_HFGM = function(K=100, X, y, beta.basis, phi, max.iteration=100, tol=0.005){
+beta_clustering = function(K = 100, X, y, beta.basis, phi, max.iteration = 200, 
+                           tol = 0.005, grp = NULL, x.basis.num = 15) {
   
-  #X is n*24 data frame
+  # Input validation
+  n <- nrow(X)
+  y <- matrix(y, ncol = 1)  # Ensure y is n×1 matrix
+  if(nrow(y) != n) stop("X and y have different number of observations")
   
-  n = nrow(X)
+  # Initialize clustering if not provided
+  if(is.null(grp)) {
+    k2 <- ClusterR::KMeans_rcpp(X, clusters = K, num_init = 5, 
+                                max_iters = 100, initializer = 'kmeans++')
+    grp <- k2$clusters
+  }
   
-  k2 = kmeans(X, centers = K, nstart = 24)
+  # Create basis for functional data
+  x.basis <- create.bspline.basis(rangeval = c(0, ncol(X)), 
+                                  nbasis = x.basis.num, norder = 4)
+  time_points <- seq(0, ncol(X), length.out = ncol(X))
   
-  grp = k2$cluster
+  # Convert X to functional data
+  X.mat <- as.matrix(X)
+  X.fd <- Data2fd(y = t(X.mat), basisobj = x.basis, argvals = time_points)
+  X.fd.mat <- t(X.fd$coefs)
+  Z0 <- inprod(X.fd$basis, beta.basis)
   
-  D = c(0,beta.basis$params, 24)
+  # Verify matrix dimensions
+  stopifnot(ncol(X.fd.mat) == nrow(Z0))  # Should be x.basis.num × beta.basis$nbasis
   
-  
-  X.mat = as.matrix(X)
-  X.fd = Data2fd(argvals = D, y= t(X.mat))
-  X.fd.mat = t(X.fd$coefs)
-  
-  
-  Z0 = inprod(X.fd$basis, beta.basis)
-  
-  
-  it = 1
-  while (it<max.iteration) {
-    grp.old = grp
+  # Clustering iterations
+  it <- 1
+  while (it < max.iteration) {
+    cat("Pre-clustering Iteration", it, "\n")
+    grp.old <- grp
     
-    
-    b.all = matrix(0, nrow = K, ncol = beta.basis$nbasis)
+    # Calculate cluster-specific coefficients
+    b.all <- matrix(NA, nrow = K, ncol = beta.basis$nbasis)
     for (l in 1:K) {
-      idx = which(grp == l)
-      X.mat.l = t(X.mat[idx,])
-      X.fd.l = Data2fd(argvals = D, y= X.mat.l)
-      y.l = y[idx,]
-      b.all[l,] = ord_func_reg(X.fd.l, y.l, beta.basis, phi)$b.hat
-    }
-    
-    
-    for (i in 1:nrow(X)) {
-      ss.i = c()
+      idx <- which(grp == l)
+      if(length(idx) == 0) next  # Skip empty clusters
       
-      for (j in 1:K) {
-        tmp = t(X.fd.mat[i,])%*%Z0%*%b.all[j,]
-        ss.i[j] = (y[i]-tmp)^2
-      }
+      X.mat.l <- t(X.mat[idx, , drop = FALSE])
+      X.fd.l <- Data2fd(y = X.mat.l, basisobj = x.basis, 
+                        argvals = time_points)
+      y.l <- matrix(y[idx], ncol = 1)
       
-      idx = which.min(ss.i)
-      grp[i] = idx
+      reg_result <- tryCatch(
+        ord_func_reg(X.fd.l, y.l, beta.basis, phi),
+        error = function(e) NULL
+      )
+      
+      if(!is.null(reg_result)) b.all[l, ] <- reg_result$b.hat
     }
     
-    if(it>=15){
-      if(vecnorm(grp.old-grp)<=tol){
-        break
-      }
+    # Remove NA clusters
+    valid_clusters <- which(!is.na(b.all[,1]))
+    if(length(valid_clusters) == 0) stop("All clusters failed")
+    b.all <- b.all[valid_clusters, , drop = FALSE]
+    
+    # Reassign observations with dimension-safe calculations
+    for (i in 1:n) {
+      distances <- sapply(1:nrow(b.all), function(j) {
+        # Ensure all matrices are properly aligned
+        x_vec <- matrix(X.fd.mat[i,], nrow = 1)  # 1 × x.basis.num
+        b_vec <- matrix(b.all[j,], ncol = 1)      # beta.basis$nbasis × 1
+        
+        # Matrix multiplication: (1 × x.basis.num) %*% (x.basis.num × beta.basis$nbasis) %*% (beta.basis$nbasis × 1)
+        tmp <- x_vec %*% Z0 %*% b_vec
+        (y[i] - tmp[1,1])^2  # Extract scalar value
+      })
+      grp[i] <- valid_clusters[which.min(distances)]
     }
     
-    
-    it = it+1
+    if(it >= 35 && sum(grp.old != grp) <= tol * n) break
+    it <- it + 1
   }
   
   return(grp)
@@ -200,7 +232,7 @@ fuse.pred = function(fuse.tmp){
   fuse.int = fuse.tmp$intercept
   y.fuse.pred = matrix(0, nrow = length(y.test), ncol = 1)
   for (i in 1:length(y.test)) {
-    if(length(fuse.int))>1{
+    if(length(fuse.int)>1){
       y.fuse.pred[i,] = as.numeric((t(x.test.coef[i,]))%*%Z%*%fuse.mat[i,]) + fuse.int[i]
     }else{
       y.fuse.pred[i,] = as.numeric((t(x.test.coef[i,]))%*%Z%*%fuse.mat[i,]) + fuse.int
@@ -257,6 +289,8 @@ replicate_rows <- function(mat, k) {
   
   return(new_mat)
 }
+
+
 
 # Resp for the case of 3/4 groups
 resp = function(clus_num, y, x, beta.basis, D=seq(0, 24, length.out=24)){
