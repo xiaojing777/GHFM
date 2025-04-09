@@ -5,10 +5,17 @@ This repository contains R scripts for the GHFM project.
 ## Files
 - `HFGM.R`: This R file includes the function of conducting HFGM.
 - `HFLM.R`: This R file includes the function of conducting HFLM.
-- `Tune_and_pre_clus.R': This R file includes how to conduct pre-clustering and how to tune parameters to HFGM.
+- `Tune_and_pre_clus.R`: This R file includes how to conduct pre-clustering and how to tune parameters to HFGM.
+
+---
 
 
-# Example Usage: Simulation and Pre-Clustering 
+## 📘 Example: Simulation and Pre-Clustering
+
+The following code demonstrates how our proposed pre-clustering method generates a finer partition of the true subgroup structure.
+
+### Code
+```R
 
 # Load required functions 
 # Also, obtain your tuned parameters, e.g., phi
@@ -75,12 +82,9 @@ true_grp = c(rep(1, n/2), rep(2, n/2))
 group_check = cbind(group_check, true_grp)
 
 
+## 📘 Example: Running HFGM
 
-
-
-# Example Usage
-
-Here is a simple example to demonstrate how to perform HFGM:
+This code shows how to apply our proposed GHFM method to simulated data
 
 ### Code Example
 ```R
