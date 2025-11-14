@@ -1,5 +1,10 @@
 # GHFM: Generalized Heterogeneous Functional Model
 
+<p align="center">
+  <img src="figs/Flowchart.png" width="500">
+</p>
+
+
 This repository contains R implementations for the heterogeneous functional regression framework described in the manuscript. The code follows the workflow below.
 
 ## Workflow
