@@ -58,7 +58,7 @@ The flow above corresponds to Figure 2 in the manuscript.
   - Skip pre-clustering, run the corresponding LQA/ADMM file on all subjects.
 
 - **Model comparison**
-  - After fitting, use `GHFM_testing.R` to test group-varying model vs. pooled model.
+  - After fitting, use `GHFM_testing.R` to test group-specific model vs. homogeneous model.
 
 ## Notes
 
