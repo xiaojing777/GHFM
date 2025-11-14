@@ -32,7 +32,6 @@ beta_clustering = function(K = 100, X, y, beta.basis, phi, max.iteration = 200,
   Z0 <- inprod(X.fd$basis, beta.basis)
   it <- 1
   while (it < max.iteration) {
-    cat("Pre-clustering iteration:", it, "\n")
     grp.old <- grp
     b.all <- matrix(NA, nrow = K, ncol = beta.basis$nbasis)
     for (l in 1:K) {
@@ -110,7 +109,6 @@ beta_clustering_logistic = function(K_pre = 30, X, y, beta.basis, phi, max.itera
   current_grp <- grp_init
   new_grp <- current_grp
   while (it <= max.iteration) {
-    cat("\n----------- iteration", it, "-----------\n")
     b.all <- matrix(NA, nrow = K_pre, ncol = beta.basis$nbasis)
     alpha.all <- rep(NA, K_pre)
     for (k in 1:K_pre) {
@@ -127,7 +125,6 @@ beta_clustering_logistic = function(K_pre = 30, X, y, beta.basis, phi, max.itera
       alpha.all[k] <- fit$alpha
     }
     valid_clusters <- which(!is.na(b.all[, 1]))
-    cat("valid clusters:", length(valid_clusters), "\n")
     if (length(valid_clusters) == 0) stop("all clusters failed")
     b.valid <- b.all[valid_clusters, , drop = FALSE]
     alpha.valid <- alpha.all[valid_clusters]
@@ -137,14 +134,17 @@ beta_clustering_logistic = function(K_pre = 30, X, y, beta.basis, phi, max.itera
       p_all <- 1 / (1 + exp(-eta_all))
       p_all <- pmin(pmax(p_all, 1e-3), 1 - 1e-3)
       log_lik <- - (y[i] * log(p_all) + (1 - y[i]) * log(1 - p_all))
+      idx_increa_order <- order(log_lik)
+      worst_idx        <- tail(idx_increa_order, 2)
+      if (!(current_grp[i] %in% worst_idx)) {
+        new_grp[i] <- current_grp[i]
+        next
+      }
       new_grp[i] <- valid_clusters[which.min(log_lik)]
     }
     change_num <- sum(new_grp != current_grp)
-    cat("changed samples:", change_num, "\n")
     current_grp <- new_grp
     it <- it + 1
   }
   return(current_grp)
 }
-
-

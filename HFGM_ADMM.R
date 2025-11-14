@@ -20,18 +20,26 @@ compute_Gamma_custom <- function(X.fd, basis) {
   Gamma
 }
 
-compute_H_block <- function(Gamma) {
+compute_H_block_with_pre_grps <- function(Gamma, pre_grp) {
   n <- nrow(Gamma)
   L <- ncol(Gamma)
+  labels <- sort(unique(pre_grp))      
+  K <- length(labels)
   H_list <- vector("list", n)
-  for (i in 1:n) {
-    mat <- matrix(0, nrow = 1, ncol = n * L)
-    mat[1, ((i - 1) * L + 1):(i * L)] <- Gamma[i, ]
-    H_list[[i]] <- mat
+  
+  for (kk in seq_along(labels)) {
+    k_lab <- labels[kk]                
+    idx.this.grp <- which(pre_grp == k_lab)
+    for (i in idx.this.grp) {
+      mat <- matrix(0, nrow = 1, ncol = K * L)
+      mat[1, ((kk - 1) * L + 1):(kk * L)] <- Gamma[i, ]
+      H_list[[i]] <- mat
+    }
   }
   H <- do.call(rbind, H_list)
   H
 }
+
 
 compute_H_block_with_pre_grps <- function(Gamma, pre_grp) {
   K <- length(unique(pre_grp))
@@ -115,7 +123,6 @@ hfgm_admm_without_pre_grp <- function(X.fd, Y, T, d, M, phi, lambda, theta, tau1
     b <- inv_matrix %*% ((1 / n) * t(H) %*% Y + theta * t(Omega) %*% (alpha_vector - v_vector / theta))
     r <- Omega %*% b - alpha_vector
     if (sqrt(sum(r^2)) < tau2) {
-      cat("Converged at iteration", m, "\n")
       break
     }
   }
@@ -169,7 +176,6 @@ hfgm_admm_with_pre_grp <- function(X.fd, Y, T, d, M, phi, lambda, theta, tau1, t
     b <- inv_matrix %*% ((1 / n) * t(H) %*% Y + theta * t(Omega) %*% (alpha_vector - v_vector / theta))
     r <- Omega %*% b - alpha_vector
     if (sqrt(sum(r^2)) < tau2) {
-      cat("Converged at iteration", m, "\n")
       break
     }
   }
@@ -184,7 +190,6 @@ fuse_group <- function(b, basis, tol = NULL) {
   if (is.null(tol)) {
     tol <- sqrt(mean(rowSums((B_mat %*% Z) * B_mat))) * 0.5
   }
-  cat("Using tol =", tol, "\n")
   grp <- 1:n
   for (i in 1:(n - 1)) {
     for (j in (i + 1):n) {

@@ -51,6 +51,7 @@ shrinkage <- function(w, t) {
 }
 
 hflm_admm_with_pre_clus <- function(X.fd, Y, T, d, M, phi, lambda, theta,
+                                    tau1 = 1, tau2 = 1, tau3 = 1,
                                     max_iter = 100, grp, init_b = NULL) {
   Y <- matrix(Y, ncol = 1)
   n <- nrow(Y)
