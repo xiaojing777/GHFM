@@ -67,3 +67,13 @@ The flow above corresponds to Figure 2 in the manuscript.
 - This README assumes the tuning parameters (smoothing, fusion, ADMM penalties) have been selected.
 - All scripts are written in base R style and use the `fda` package for functional data objects.
 
+## Simulation example
+
+A simple end-to-end example is provided in `Simulation_Example.R`.
+
+After cloning this repository, you can run it from the GHFM root directory via:
+
+```bash
+Rscript Simulation_Example.R
+
+

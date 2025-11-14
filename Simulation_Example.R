@@ -10,11 +10,12 @@ library(dplyr)
 library(tidyr)
 library(aricode)
 
-source("/Users/xiaojing/Desktop/GitHub Projects/GHFM/pre_clustering.R")
-source("/Users/xiaojing/Desktop/GitHub Projects/GHFM/HFGM_ADMM.R")
-source("/Users/xiaojing/Desktop/GitHub Projects/GHFM/HFLM_ADMM.R")
-source("/Users/xiaojing/Desktop/GitHub Projects/GHFM/GHFM_testing.R")
-source("/Users/xiaojing/Desktop/GitHub Projects/GHFM/Additional_Functions.R")
+source("pre_clustering.R")
+source("HFGM_ADMM.R")
+source("HFLM_ADMM.R")
+source("GHFM_testing.R")
+source("Additional_Functions.R")
+
 
 
 
