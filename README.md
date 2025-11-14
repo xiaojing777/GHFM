@@ -19,29 +19,27 @@ This repository contains R implementations for the heterogeneous functional regr
      - Continuous → apply HFGM to all subjects.
      - Binary → apply HFLM to all subjects.
 5. **(Optional) Testing**
-   - Use the testing script to compare the group-varying model vs. the pooled model.
+   - Use the testing script to compare the heterogeneous model vs. the homogeneous model.
 
 The flow above corresponds to Figure 2 in the manuscript.
 
 ## Files
 
 - `pre_clustering.R`  
-  - Functions to obtain \(K\) initial subject groups for large-\(n\) cases.
-  - Supports Gaussian and logistic responses.
+  - Functions to obtain \(K\) pre-clustering groups for large-\(n\) cases.
+  - Supports continuous and binary responses.
 
 - `HFGM_LQA.R`  
   - LQA-based implementation of the heterogeneous **functional** regression for continuous response.
-  - Use this when there is **no** pre-clustering or when you want a direct LQA version.
 
 - `HFLM_LQA.R`  
   - LQA-based implementation of the heterogeneous **functional logistic** regression for binary response.
 
 - `HFGM_ADMM.R`  
   - ADMM-based implementation for continuous response.
-  - Contains two versions: without pre-groups and with pre-groups.
-
+  
 - `HFLM_ADMM.R`  
-  - ADMM-based implementation for binary response with pre-clustering groups.
+  - ADMM-based implementation for binary response.
 
 - `GHFM_testing.R`  
   - Procedures for comparing the reduced model (common functional coefficient) vs. the full model (group-specific functional coefficients) for both Gaussian and Bernoulli responses.
