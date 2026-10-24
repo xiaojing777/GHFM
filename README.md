@@ -49,6 +49,9 @@ The flow above corresponds to Figure 2 in the manuscript.
 - `GHFM_testing.R`  
   - Procedures for comparing the reduced model (common functional coefficient) vs. the full model (group-specific functional coefficients) for both Gaussian and Bernoulli responses.
 
+- `Additional_Functions.R`  
+  - Evaluation metrics (ISE, Purity) and the existing methods (Oracle, HSFLM, FunMR, DevKM) used in the simulation.
+
 ## Typical usage
 
 - **Large sample, continuous response**
@@ -78,5 +81,4 @@ After cloning this repository, you can run it from the GHFM root directory via:
 
 ```bash
 Rscript Simulation_Example.R
-
-
+```

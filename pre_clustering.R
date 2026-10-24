@@ -2,149 +2,125 @@ library(fda)
 library(MASS)
 library(ClusterR)
 
-ord_func_reg = function(x.fd, y, beta.basis, phi) {
+ord_func_reg = function(x.fd, y, beta.basis, phi, eps0, intercept = FALSE) {
   y <- matrix(y, ncol = 1)
+  n <- nrow(y)
   Z0 <- inprod(x.fd$basis, beta.basis)
   Z <- t(x.fd$coefs) %*% Z0
   R <- eval.penalty(beta.basis, int2Lfd(2))
-  diag_adjust <- 0.01 * diag(nrow(R))
-  b.hat <- solve(t(Z) %*% Z + phi * R + diag_adjust) %*% t(Z) %*% y
-  X.train.26 <- t(x.fd$coefs)
-  alpha <- mean(y - X.train.26 %*% Z0 %*% b.hat)
+  Zc <- sweep(Z, 2, intercept * colMeans(Z))
+  b.hat <- solve(t(Zc) %*% Zc / n + phi * R + eps0 * diag(ncol(Z))) %*% t(Zc) %*% (y - intercept * mean(y)) / n
+  alpha <- intercept * mean(y - Z %*% b.hat)
   return(list(b.hat = b.hat, alpha = alpha))
 }
 
-beta_clustering = function(K = 100, X, y, beta.basis, phi, max.iteration = 200,
-                           tol = 0.005, grp = NULL, x.basis.num = 15) {
-  n <- nrow(X)
-  y <- matrix(y, ncol = 1)
-  if (is.null(grp)) {
-    k2 <- ClusterR::KMeans_rcpp(X, clusters = K, num_init = 5,
-                                max_iters = 100, initializer = "kmeans++")
-    grp <- k2$clusters
+pre_clus_fit = function(Gamma, z, w, grp, beta.basis, phi, eps0, intercept = FALSE) {
+  R <- eval.penalty(beta.basis, int2Lfd(2))
+  labs <- sort(unique(grp))
+  b.d <- matrix(0, nrow = length(labs), ncol = ncol(Gamma))
+  b.c <- b.d
+  for (l in seq_along(labs)) {
+    idx <- which(grp == labs[l])
+    G.l <- Gamma[idx, , drop = FALSE]
+    A.inv <- ginv(t(G.l) %*% (w[idx] * G.l) + length(idx) * (phi * R + eps0 * diag(ncol(Gamma))))
+    b.d[l, ] <- A.inv %*% t(G.l) %*% (w[idx] * z[idx])
+    b.c[l, ] <- A.inv %*% t(G.l) %*% w[idx]
   }
-  x.basis <- create.bspline.basis(rangeval = c(0, ncol(X)),
-                                  nbasis = x.basis.num, norder = 4)
-  time_points <- seq(0, ncol(X), length.out = ncol(X))
-  X.mat <- as.matrix(X)
-  X.fd <- Data2fd(y = t(X.mat), basisobj = x.basis, argvals = time_points)
-  X.fd.mat <- t(X.fd$coefs)
-  Z0 <- inprod(X.fd$basis, beta.basis)
-  it <- 1
-  while (it < max.iteration) {
-    grp.old <- grp
-    b.all <- matrix(NA, nrow = K, ncol = beta.basis$nbasis)
-    for (l in 1:K) {
-      idx <- which(grp == l)
-      if (length(idx) == 0) next
-      X.mat.l <- t(X.mat[idx, , drop = FALSE])
-      X.fd.l <- Data2fd(y = X.mat.l, basisobj = x.basis, argvals = time_points)
-      y.l <- matrix(y[idx], ncol = 1)
-      reg_result <- ord_func_reg(X.fd.l, y.l, beta.basis, phi)
-      b.all[l, ] <- reg_result$b.hat
-    }
-    valid_clusters <- which(!is.na(b.all[, 1]))
-    b.all <- b.all[valid_clusters, , drop = FALSE]
-    for (i in 1:n) {
-      distances <- sapply(1:nrow(b.all), function(j) {
-        x_vec <- matrix(X.fd.mat[i, ], nrow = 1)
-        b_vec <- matrix(b.all[j, ], ncol = 1)
-        tmp <- x_vec %*% Z0 %*% b_vec
-        (y[i, 1] - tmp[1, 1])^2
-      })
-      grp[i] <- valid_clusters[which.min(distances)]
-    }
-    if (it >= 35 && sum(grp.old != grp) <= tol * n) break
-    it <- it + 1
+  k <- match(grp, labs)
+  alpha <- 0
+  if (intercept) {
+    alpha <- (sum(w * z) - sum(w * rowSums(Gamma * b.d[k, , drop = FALSE]))) /
+      (sum(w) - sum(w * rowSums(Gamma * b.c[k, , drop = FALSE])))
   }
-  return(grp)
+  return(list(labs = labs, b.all = b.d - alpha * b.c, alpha = alpha))
 }
 
-ord_func_logistic = function(x.fd, y, beta.basis, phi, max.iter = 50, tol = 1e-3) {
+beta_clustering = function(K, X, y, beta.basis, phi, eps0, max.iteration, tol, grp = NULL, x.basis.num,
+                           intercept = FALSE) {
+  n <- nrow(X)
+  y <- as.numeric(y)
+  x.basis <- create.bspline.basis(rangeval = c(0, ncol(X)), nbasis = x.basis.num, norder = 4)
+  time_points <- seq(0, ncol(X), length.out = ncol(X))
+  X.fd <- Data2fd(y = t(as.matrix(X)), basisobj = x.basis, argvals = time_points)
+  X.fd.mat <- t(X.fd$coefs)
+  if (is.null(grp)) {
+    grp <- ClusterR::KMeans_rcpp(X.fd.mat, clusters = K, num_init = 5,
+                                 max_iters = 100, initializer = "kmeans++")$clusters
+  }
+  Gamma <- X.fd.mat %*% inprod(X.fd$basis, beta.basis)
+  it <- 1
+  while (it <= max.iteration) {
+    grp.old <- grp
+    fit <- pre_clus_fit(Gamma, y, rep(1, n), grp, beta.basis, phi, eps0, intercept)
+    distances <- (y - fit$alpha - Gamma %*% t(fit$b.all))^2
+    grp <- fit$labs[apply(distances, 1, which.min)]
+    if (sum(grp.old != grp) <= tol * n) break
+    it <- it + 1
+  }
+  return(match(grp, sort(unique(grp))))
+}
+
+ord_func_logistic = function(x.fd, y, beta.basis, phi, eps0, max.iter, tol, intercept = FALSE) {
   y <- as.numeric(y)
   n <- length(y)
   Z0 <- inprod(x.fd$basis, beta.basis)
   gamma_mat <- t(x.fd$coefs) %*% Z0
   R <- eval.penalty(beta.basis, int2Lfd(2))
-  diag_adjust <- 1e-3 * diag(nrow(R))
   b <- matrix(0, nrow = ncol(gamma_mat), ncol = 1)
   alpha <- 0
+  eta <- rep(0, n)
   for (iter in 1:max.iter) {
-    eta <- as.vector(alpha + gamma_mat %*% b)
     p <- 1 / (1 + exp(-eta))
-    p <- pmin(pmax(p, 1e-4), 1 - 1e-4)
-    W <- p * (1 - p)
-    W_sqrt <- sqrt(W)
+    W <- pmax(p * (1 - p), 1e-4 * (1 - 1e-4))
     tilde_y <- eta + (y - p) / W
-    bar_Y <- W_sqrt * tilde_y
-    bar_gamma <- gamma_mat * W_sqrt
-    lhs <- crossprod(bar_gamma) / n + phi * R + diag_adjust
-    rhs <- crossprod(bar_gamma, bar_Y) / n
-    b_new <- solve(lhs, rhs)
-    alpha_new <- mean(bar_Y - bar_gamma %*% b_new)
-    if (max(abs(b_new - b)) < tol && abs(alpha_new - alpha) < tol) {
-      b <- b_new
-      alpha <- alpha_new
-      break
-    }
-    b <- b_new
-    alpha <- alpha_new
+    gamma_bar <- intercept * colSums(W * gamma_mat) / sum(W)
+    y_bar <- intercept * sum(W * tilde_y) / sum(W)
+    gamma_c <- sweep(gamma_mat, 2, gamma_bar)
+    lhs <- crossprod(gamma_c, W * gamma_c) / n + phi * R + eps0 * diag(ncol(gamma_mat))
+    rhs <- crossprod(gamma_c, W * (tilde_y - y_bar)) / n
+    b <- solve(lhs, rhs)
+    alpha <- y_bar - sum(gamma_bar * b)
+    eta_new <- as.vector(alpha + gamma_mat %*% b)
+    if (max(abs(eta_new - eta)) < tol) break
+    eta <- eta_new
   }
   return(list(b.hat = b, alpha = alpha))
 }
 
-beta_clustering_logistic = function(K_pre = 30, X, y, beta.basis, phi, max.iteration = 100,
-                                    tol = 0.005, grp_init = NULL, x.basis.num = 15) {
+beta_clustering_logistic = function(K_pre, X, y, beta.basis, phi, eps0, max.iteration, tol,
+                                    grp_init = NULL, x.basis.num, max.iter, intercept = FALSE) {
   n <- nrow(X)
   y <- as.numeric(y)
-  if (is.null(grp_init)) {
-    grp_init <- ClusterR::KMeans_rcpp(X, clusters = K_pre)$clusters
-  }
   x.basis <- create.bspline.basis(rangeval = c(0, ncol(X)), nbasis = x.basis.num, norder = 4)
   time_points <- seq(0, ncol(X), length.out = ncol(X))
-  X.fd <- Data2fd(y = t(X), argvals = time_points, basisobj = x.basis)
-  Z0 <- inprod(X.fd$basis, beta.basis)
+  X.fd <- Data2fd(y = t(as.matrix(X)), argvals = time_points, basisobj = x.basis)
   X.fd.mat <- t(X.fd$coefs)
-  it <- 1
+  if (is.null(grp_init)) {
+    grp_init <- ClusterR::KMeans_rcpp(X.fd.mat, clusters = K_pre, num_init = 5,
+                                      max_iters = 100, initializer = "kmeans++")$clusters
+  }
+  Gamma <- X.fd.mat %*% inprod(X.fd$basis, beta.basis)
   current_grp <- grp_init
-  new_grp <- current_grp
+  eta <- rep(0, n)
+  it <- 1
   while (it <= max.iteration) {
-    b.all <- matrix(NA, nrow = K_pre, ncol = beta.basis$nbasis)
-    alpha.all <- rep(NA, K_pre)
-    for (k in 1:K_pre) {
-      idx <- which(current_grp == k)
-      if (length(idx) < 1) {
-        b.all[k, ] <- NA_real_
-        alpha.all[k] <- NA_real_
-        next
-      }
-      X.l <- t(X[idx, , drop = FALSE])
-      X.fd.l <- Data2fd(y = X.l, argvals = time_points, basisobj = x.basis)
-      fit <- ord_func_logistic(X.fd.l, y[idx], beta.basis, phi = phi)
-      b.all[k, ] <- fit$b.hat
-      alpha.all[k] <- fit$alpha
+    for (iter in 1:max.iter) {
+      p <- 1 / (1 + exp(-eta))
+      W <- pmax(p * (1 - p), 1e-4 * (1 - 1e-4))
+      fit <- pre_clus_fit(Gamma, eta + (y - p) / W, W, current_grp, beta.basis, phi, eps0, intercept)
+      eta_new <- fit$alpha + rowSums(Gamma * fit$b.all[match(current_grp, fit$labs), , drop = FALSE])
+      conv <- max(abs(eta_new - eta)) < tol
+      eta <- eta_new
+      if (conv) break
     }
-    valid_clusters <- which(!is.na(b.all[, 1]))
-    if (length(valid_clusters) == 0) stop("all clusters failed")
-    b.valid <- b.all[valid_clusters, , drop = FALSE]
-    alpha.valid <- alpha.all[valid_clusters]
-    for (i in 1:n) {
-      gamma_i <- X.fd.mat[i, ] %*% Z0
-      eta_all <- gamma_i %*% t(b.valid) + matrix(alpha.valid, nrow = 1)
-      p_all <- 1 / (1 + exp(-eta_all))
-      p_all <- pmin(pmax(p_all, 1e-3), 1 - 1e-3)
-      log_lik <- - (y[i] * log(p_all) + (1 - y[i]) * log(1 - p_all))
-      idx_increa_order <- order(log_lik)
-      worst_idx        <- tail(idx_increa_order, 2)
-      if (!(current_grp[i] %in% worst_idx)) {
-        new_grp[i] <- current_grp[i]
-        next
-      }
-      new_grp[i] <- valid_clusters[which.min(log_lik)]
-    }
+    eta_all <- fit$alpha + Gamma %*% t(fit$b.all)
+    log_lik <- log1p(exp(-abs(eta_all))) + pmax(eta_all, 0) - y * eta_all
+    new_grp <- fit$labs[apply(log_lik, 1, which.min)]
     change_num <- sum(new_grp != current_grp)
     current_grp <- new_grp
+    eta <- fit$alpha + rowSums(Gamma * fit$b.all[match(current_grp, fit$labs), , drop = FALSE])
+    if (change_num <= tol * n) break
     it <- it + 1
   }
-  return(current_grp)
+  return(match(current_grp, sort(unique(current_grp))))
 }

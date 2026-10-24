@@ -5,11 +5,9 @@ compute_basis_custom <- function(T, d, M) {
   create.bspline.basis(rangeval = c(0, T), nbasis = M + d, norder = d + 1)
 }
 
-compute_R_custom <- function(basis, K) {
+compute_R_custom <- function(basis, w) {
   R1 <- eval.penalty(basis, int2Lfd(2))
-  rlist <- replicate(K, R1, simplify = FALSE)
-  R_block <- bdiag(rlist)
-  as.matrix(R_block)
+  array(sapply(w, function(m) m * R1), dim = c(nrow(R1), ncol(R1), length(w)))
 }
 
 compute_Gamma_with_pre_clus_custom <- function(X.fd, basis, grp) {
@@ -18,17 +16,9 @@ compute_Gamma_with_pre_clus_custom <- function(X.fd, basis, grp) {
   X.coef <- t(X.fd$coefs)
   inprod_mat <- inprod(X.fd$basis, basis)
   X.neiji <- X.coef %*% inprod_mat
-  K <- length(unique(grp))
-  Gamma <- matrix(0, nrow = n, ncol = K * L)
-  for (k in 1:K) {
-    idx_k <- which(grp == k)
-    if (length(idx_k) == 0) next
-    neiji.k.data <- X.neiji[idx_k, , drop = FALSE]
-    for (i in seq_along(idx_k)) {
-      Gamma[idx_k[i], ((k - 1) * L + 1):(k * L)] <- neiji.k.data[i, ]
-    }
-  }
-  Gamma
+  k <- match(grp, sort(unique(grp)))
+  sparseMatrix(i = rep(1:n, each = L), j = rep((k - 1) * L, each = L) + rep(1:L, n),
+               x = as.vector(t(X.neiji)), dims = c(n, max(k) * L))
 }
 
 compute_Omega_custom <- function(K, L) {
@@ -38,100 +28,117 @@ compute_Omega_custom <- function(K, L) {
   col_inds <- as.vector(rbind(cmat[1, ], cmat[2, ]))
   vals <- as.vector(rbind(rep(1, m), rep(-1, m)))
   eps_sparse <- sparseMatrix(i = row_inds, j = col_inds, x = vals, dims = c(m, K))
-  kronecker(eps_sparse, diag(L))
+  kronecker(eps_sparse, Diagonal(L))
 }
 
 shrinkage <- function(w, t) {
-  nw <- sqrt(sum(w^2))
-  if (nw > t) {
-    (1 - t / nw) * w
-  } else {
-    rep(0, length(w))
-  }
+  nw <- sqrt(colSums(w^2))
+  w * rep(ifelse(nw > t, 1 - t / nw, 0), each = nrow(w))
 }
 
-hflm_admm_with_pre_clus <- function(X.fd, Y, T, d, M, phi, lambda, theta,
-                                    tau1 = 1, tau2 = 1, tau3 = 1,
-                                    max_iter = 100, grp, init_b = NULL) {
-  Y <- matrix(Y, ncol = 1)
-  n <- nrow(Y)
-  K <- length(unique(grp))
+admm_factor <- function(B, theta) {
+  L <- dim(B)[1]
+  K <- dim(B)[3]
+  Dinv <- vector("list", K)
+  DB <- matrix(0, L, L)
+  for (k in 1:K) {
+    Dinv[[k]] <- solve(B[, , k] + theta * K * diag(L))
+    DB <- DB + Dinv[[k]] %*% B[, , k]
+  }
+  list(Dinv = bdiag(Dinv), C = theta * K * solve(DB), L = L, K = K)
+}
+
+admm_solve <- function(fac, rhs, a, s) {
+  Minv <- function(y) {
+    z <- as.vector(fac$Dinv %*% y)
+    u <- as.vector(fac$C %*% rowSums(matrix(z, nrow = fac$L)))
+    z + as.vector(fac$Dinv %*% rep(u, fac$K))
+  }
+  if (length(rhs) == fac$K * fac$L) {
+    return(Minv(rhs))
+  }
+  My <- Minv(rhs[-1])
+  Ms <- Minv(s)
+  x0 <- (rhs[1] - sum(s * My)) / (a - sum(s * Ms))
+  c(x0, My - x0 * Ms)
+}
+
+hflm_admm_with_pre_clus <- function(X.fd, Y, T, d, M, phi, eps0, lambda, theta,
+                                    tau1, tau2, tau3, max_iter, lambda0, grp, init_b = NULL, intercept = FALSE) {
+  Y <- as.vector(Y)
+  n <- length(Y)
+  labs <- sort(unique(grp))
+  K <- length(labs)
+  kidx <- match(grp, labs)
+  nk <- as.numeric(table(factor(grp, levels = labs)))
   basis <- compute_basis_custom(T, d, M)
   L <- basis$nbasis
-  R <- compute_R_custom(basis, K)
+  R <- compute_R_custom(basis, rep(1, K))
   Gamma <- compute_Gamma_with_pre_clus_custom(X.fd, basis, grp)
+  X.neiji <- t(X.fd$coefs) %*% inprod(X.fd$basis, basis)
   Omega <- compute_Omega_custom(K, L)
-  matrix_to_invert <- (1 / K) * crossprod(Gamma) + phi * R + lambda * crossprod(Omega)
-  diag(matrix_to_invert) <- diag(matrix_to_invert) + 1e-3
-  inv_matrix <- chol2inv(chol(matrix_to_invert))
+  pairs <- combn(K, 2)
+  if (intercept) {
+    Gamma <- cbind(1, Gamma)
+    Omega <- cbind(0, Omega)
+  }
+  irls_blocks <- function(w, z) {
+    B <- R
+    for (k in 1:K) {
+      idx <- which(kidx == k)
+      B[, , k] <- crossprod(X.neiji[idx, , drop = FALSE] * sqrt(w[idx])) / n + phi * R[, , k] + eps0 * diag(L)
+    }
+    s_vec <- as.vector(sapply(1:K, function(k) colSums(X.neiji[kidx == k, , drop = FALSE] * w[kidx == k]))) / n
+    list(B = B, s = s_vec, a = sum(w) / n, rhs = as.vector(crossprod(Gamma, w * z)) / n)
+  }
   if (is.null(init_b)) {
-    b <- inv_matrix %*% ((1 / K) * t(Gamma) %*% Y)
+    blk <- irls_blocks(rep(1, n), Y)
+    b <- admm_solve(admm_factor(blk$B, lambda0), blk$rhs, blk$a, blk$s)
   } else {
-    b <- init_b
+    b <- as.vector(init_b)
   }
-  b <- as.matrix(b)
-  alpha <- matrix(0, nrow = K * (K - 1) / 2, ncol = L)
-  v <- matrix(0, nrow = K * (K - 1) / 2, ncol = L)
+  alpha <- matrix(0, nrow = L, ncol = ncol(pairs))
+  v <- matrix(0, nrow = L, ncol = ncol(pairs))
   for (m in 1:max_iter) {
-    p <- 1 / (1 + exp(-Gamma %*% b))
-    p[p > 0.999] <- 0.999
-    p[p < 0.001] <- 0.001
-    w <- as.vector(p * (1 - p))
-    bar_Gamma <- Gamma * sqrt(w)
-    tilde_y <- Gamma %*% b + (Y - p) / w
-    bar_Y <- sqrt(w) * tilde_y
-    idxcount <- 0
-    for (i in 1:(K - 1)) {
-      for (j in (i + 1):K) {
-        idxcount <- idxcount + 1
-        b_i <- b[((i - 1) * L + 1):(i * L), , drop = FALSE]
-        b_j <- b[((j - 1) * L + 1):(j * L), , drop = FALSE]
-        diff_b <- as.vector(b_i - b_j)
-        alpha[idxcount, ] <- shrinkage(diff_b + v[idxcount, ] / theta, lambda / theta)
-      }
-    }
-    idxcount <- 0
-    for (i in 1:(K - 1)) {
-      for (j in (i + 1):K) {
-        idxcount <- idxcount + 1
-        b_i <- b[((i - 1) * L + 1):(i * L), , drop = FALSE]
-        b_j <- b[((j - 1) * L + 1):(j * L), , drop = FALSE]
-        v[idxcount, ] <- v[idxcount, ] + theta * (as.vector(b_i - b_j) - alpha[idxcount, ])
-      }
-    }
-    alpha_vector <- as.vector(t(alpha))
-    v_vector <- as.vector(t(v))
-    matrix_to_invert <- (1 / K) * crossprod(bar_Gamma) + phi * R + theta * crossprod(Omega)
-    diag(matrix_to_invert) <- diag(matrix_to_invert) + 1e-3
-    inv_matrix <- chol2inv(chol(matrix_to_invert))
-    b <- inv_matrix %*% (
-      (1 / K) * t(bar_Gamma) %*% bar_Y +
-        theta * t(Omega) %*% (alpha_vector - v_vector / theta)
-    )
-    r <- Omega %*% b - alpha_vector
-    if (sqrt(sum(r^2)) < 1e-4) break
+    eta <- as.vector(Gamma %*% b)
+    p <- 1 / (1 + exp(-eta))
+    w <- pmax(p * (1 - p), 0.001 * 0.999)
+    tilde_y <- eta + (Y - p) / w
+    blk <- irls_blocks(w, tilde_y)
+    alpha_old <- alpha
+    diff_b <- matrix(as.vector(Omega %*% b), nrow = L)
+    thresh <- lambda / (theta * tau1) * (sqrt(colSums(alpha_old^2)) <= tau1)
+    alpha <- shrinkage(diff_b + v / theta, thresh)
+    b <- admm_solve(admm_factor(blk$B, theta), blk$rhs + as.vector(crossprod(Omega, as.vector(theta * alpha - v))),
+                    blk$a, blk$s)
+    diff_b <- matrix(as.vector(Omega %*% b), nrow = L)
+    v <- v + theta * (diff_b - alpha)
+    r <- sqrt(sum((diff_b - alpha)^2))
+    s <- theta * sqrt(sum(crossprod(Omega, as.vector(alpha - alpha_old))^2))
+    if (r < tau2 && s < tau2) break
   }
-  list(b = b, alpha = alpha_vector, v = v_vector, basis = basis)
+  b0 <- 0
+  if (intercept) {
+    b0 <- b[1]
+    b <- b[-1]
+  }
+  D <- matrix(0, K, K)
+  D[t(pairs)] <- sqrt(colSums(alpha^2))
+  group <- cutree(hclust(as.dist(D + t(D)), method = "single"), h = tau3)
+  b_mat <- matrix(b, nrow = K, byrow = TRUE)
+  b_group <- t(sapply(sort(unique(group)), function(g)
+    colSums(nk[group == g] * b_mat[group == g, , drop = FALSE]) / sum(nk[group == g])))
+  list(b = b, intercept = b0, alpha = as.vector(alpha), v = as.vector(v), basis = basis,
+       group = group, b.group = b_group, iter = m)
 }
 
-fuse_group <- function(beta.basis, b.mat, tol = 0) {
+fuse_group <- function(beta.basis, b.mat, tol) {
   Z <- inprod(beta.basis, beta.basis)
-  if (tol != 0) {
-    tau <- tol
-  } else {
-    tau <- sqrt(mean(rowSums((b.mat %*% Z) * b.mat))) * 0.5
-  }
-  grp <- 1:nrow(b.mat)
-  for (i in 1:(nrow(b.mat) - 1)) {
-    for (j in (i + 1):nrow(b.mat)) {
-      tmp <- b.mat[i, ] - b.mat[j, ]
-      difference <- sqrt(t(tmp) %*% Z %*% tmp)
-      if (difference <= tau) {
-        grp[j] <- grp[i]
-        b.mat[j, ] <- b.mat[i, ]
-      }
-    }
+  C <- chol(Z)
+  grp <- cutree(hclust(dist(b.mat %*% t(C)), method = "single"), h = tol)
+  for (g in unique(grp)) {
+    b.mat[grp == g, ] <- matrix(colMeans(b.mat[grp == g, , drop = FALSE]), nrow = sum(grp == g),
+                                ncol = ncol(b.mat), byrow = TRUE)
   }
   list(group = grp, b.hat = b.mat)
 }
-
